@@ -25,7 +25,32 @@ func (h *Handler) RegisterRoutes(router *gin.RouterGroup) {
 }
 
 func (h *Handler) handleLogin(c *gin.Context) {
-	c.IndentedJSON(http.StatusOK, gin.H{})
+	// get JSON payload
+	var payload types.LoginUserPayload
+	if err := utils.ParseJSON(c, &payload); err != nil {
+		utils.WriteError(c, http.StatusBadRequest, err)
+		return
+	}
+
+	// validate the payload
+	if err := utils.Validate.Struct(payload); err != nil {
+		errors := err.(validator.ValidationErrors)
+		utils.WriteError(c, http.StatusBadRequest, fmt.Errorf("invalid payload %v", errors))
+	}
+
+	// find user by email
+	user, err := h.store.GetUserByEmail(payload.Email)
+	if err != nil {
+		utils.WriteJSON(c, http.StatusBadRequest, fmt.Errorf("not found, invalid email or password"))
+		return
+	}
+
+	if !auth.ComparePassword(user.Password, []byte(payload.Password)) {
+		utils.WriteJSON(c, http.StatusBadRequest, fmt.Errorf("not found, invalid email or password"))
+		return
+	}
+
+	utils.WriteJSON(c, http.StatusOK, map[string]string{"token": ""})
 }
 
 func (h *Handler) handleRegister(c *gin.Context) {
