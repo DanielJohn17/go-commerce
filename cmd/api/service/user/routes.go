@@ -7,6 +7,7 @@ import (
 	"github.com/DanielJohn17/go-commerce/cmd/api/service/auth"
 	"github.com/DanielJohn17/go-commerce/cmd/api/types"
 	"github.com/DanielJohn17/go-commerce/cmd/api/utils"
+	"github.com/DanielJohn17/go-commerce/config"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 )
@@ -46,11 +47,18 @@ func (h *Handler) handleLogin(c *gin.Context) {
 	}
 
 	if !auth.ComparePassword(user.Password, []byte(payload.Password)) {
-		utils.WriteJSON(c, http.StatusBadRequest, fmt.Errorf("not found, invalid email or password"))
+		utils.WriteError(c, http.StatusBadRequest, fmt.Errorf("not found, invalid email or password"))
 		return
 	}
 
-	utils.WriteJSON(c, http.StatusOK, map[string]string{"token": ""})
+	secret := []byte(config.Envs.JWTSecret)
+	token, err := auth.CreateJWT(secret, user.ID)
+	if err != nil {
+		utils.WriteError(c, http.StatusInternalServerError, err)
+		return
+	}
+
+	utils.WriteJSON(c, http.StatusOK, map[string]string{"token": token})
 }
 
 func (h *Handler) handleRegister(c *gin.Context) {
