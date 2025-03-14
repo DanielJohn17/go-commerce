@@ -5,7 +5,10 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 )
+
+var Validate = validator.New()
 
 func ParseJSON(c *gin.Context, payload any) error {
 	if c.Request.Body == nil {

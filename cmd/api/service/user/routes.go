@@ -8,6 +8,7 @@ import (
 	"github.com/DanielJohn17/go-commerce/cmd/api/types"
 	"github.com/DanielJohn17/go-commerce/cmd/api/utils"
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 )
 
 type Handler struct {
@@ -28,17 +29,27 @@ func (h *Handler) handleLogin(c *gin.Context) {
 }
 
 func (h *Handler) handleRegister(c *gin.Context) {
+	// get JSON payload
 	var newUser types.RegisterUserPayload
-	if err := utils.ParseJSON(c, newUser); err != nil {
+	if err := utils.ParseJSON(c, &newUser); err != nil {
 		utils.WriteError(c, http.StatusBadRequest, err)
+		return
 	}
 
+	// validate the payload
+	if err := utils.Validate.Struct(newUser); err != nil {
+		errors := err.(validator.ValidationErrors)
+		utils.WriteError(c, http.StatusBadRequest, fmt.Errorf("invalid payload %v", errors))
+	}
+
+	// check if user exists
 	_, err := h.store.GetUserByEmail(newUser.Email)
 	if err == nil {
 		utils.WriteError(c, http.StatusBadRequest, fmt.Errorf("user with email %s already exists", newUser.Email))
 		return
 	}
 
+	// create user
 	hashedPassword, err := auth.HashPassword(newUser.Password)
 	if err != nil {
 		utils.WriteError(c, http.StatusInternalServerError, err)
