@@ -51,3 +51,25 @@ func scanRowsIntoProduct(rows *sql.Rows) (*types.Product, error) {
 
 	return product, nil
 }
+
+func (s *Store) CreateProduct(p types.Product) (types.Product, error) {
+	result, err := s.db.Exec("INSERT INTO products (name, description, image, price, quantity) VALUES (?, ?, ?, ?, ?)",
+		p.Name, p.Description, p.Image, p.Price, p.Quantity)
+	if err != nil {
+		return types.Product{}, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return types.Product{}, err
+	}
+
+	return types.Product{
+		ID:          int(id),
+		Name:        p.Name,
+		Description: p.Description,
+		Image:       p.Image,
+		Price:       p.Price,
+		Quantity:    p.Quantity,
+	}, nil
+}
