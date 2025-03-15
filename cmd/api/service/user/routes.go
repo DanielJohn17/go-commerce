@@ -73,6 +73,7 @@ func (h *Handler) handleRegister(c *gin.Context) {
 	if err := utils.Validate.Struct(newUser); err != nil {
 		errors := err.(validator.ValidationErrors)
 		utils.WriteError(c, http.StatusBadRequest, fmt.Errorf("invalid payload %v", errors))
+		return
 	}
 
 	// check if user exists
