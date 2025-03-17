@@ -53,3 +53,4 @@ type LoginUserPayload struct {
 	Email    string `json:"Email" validate:"required,email"`
 	Password string `json:"password" validate:"required"`
 }
+	GetProductsByIDs(ps []int) ([]Product, error)
