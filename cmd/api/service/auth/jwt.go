@@ -1,12 +1,23 @@
 package auth
 
 import (
+	"context"
+	"fmt"
+	"log"
+	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/DanielJohn17/go-commerce/cmd/api/types"
+	"github.com/DanielJohn17/go-commerce/cmd/api/utils"
 	"github.com/DanielJohn17/go-commerce/config"
+	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
+
+type contextKey string
+
+const UserKey contextKey = "userID"
 
 func CreateJWT(secret []byte, userID int) (string, error) {
 	expiration := time.Second * time.Duration(config.Envs.JWTExpirationInSeconds)
@@ -21,4 +32,75 @@ func CreateJWT(secret []byte, userID int) (string, error) {
 	}
 
 	return tokenString, nil
+}
+
+func WithJWTAuth(handlerFunc gin.HandlerFunc, store types.UserStore) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tokenString := getTokenFromRequest(c)
+
+		token, err := validateToken(tokenString)
+		if err != nil {
+			log.Printf("faild to validate token: %v", err)
+			permissionDenied(c)
+			return
+		}
+
+		if !token.Valid {
+			log.Println("invalid token")
+			permissionDenied(c)
+			return
+		}
+
+		claims := token.Claims.(jwt.MapClaims)
+		str := claims["userID"].(string)
+
+		userID, _ := strconv.Atoi(str)
+
+		u, err := store.GetUserByID(userID)
+		if err != nil {
+			log.Printf("failed to get user by id: %v", err)
+			permissionDenied(c)
+			return
+		}
+
+		ctx := c.Request.Context()
+
+		ctx = context.WithValue(ctx, UserKey, u.ID)
+
+		c.Request = c.Request.WithContext(ctx)
+
+		handlerFunc(c)
+	}
+}
+
+func getTokenFromRequest(c *gin.Context) string {
+	tokenAuth := c.Request.Header.Get("Authorization")
+
+	if tokenAuth != "" {
+		return tokenAuth
+	}
+
+	return ""
+}
+
+func validateToken(t string) (*jwt.Token, error) {
+	return jwt.Parse(t, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+		return []byte(config.Envs.JWTSecret), nil
+	})
+}
+
+func permissionDenied(c *gin.Context) {
+	utils.WriteError(c, http.StatusForbidden, fmt.Errorf("permission denied"))
+}
+
+func GetUserIDFromContext(ctx context.Context) int {
+	userID, ok := ctx.Value(UserKey).(int)
+	if !ok {
+		return -1
+	}
+
+	return userID
 }
